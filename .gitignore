@@ -1,0 +1,8 @@
+*.csv
+__pycache__/
+*.pyc
+.env
+*.log
+venv/
+.vscode/
+TEST*
