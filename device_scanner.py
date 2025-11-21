@@ -7,6 +7,8 @@ Usage: python3 device_scanner.py <csv_file>
 import csv
 import sys
 import os
+import tty
+import termios
 from pathlib import Path
 
 # ANSI color codes for terminal output
@@ -22,6 +24,65 @@ class Colors:
 def clear_screen():
     """Clear the terminal screen"""
     os.system('clear' if os.name != 'nt' else 'cls')
+
+def get_scanner_input(prompt, auto_submit_length=6):
+    """
+    Get input character by character and auto-submit when reaching specified length.
+    Supports backspace and manual enter for special commands.
+    Falls back to regular input if not in an interactive terminal.
+    """
+    # Check if stdin is a terminal (tty)
+    if not sys.stdin.isatty():
+        # Fallback to regular input for piped/redirected input
+        return input(prompt).strip()
+
+    print(prompt, end='', flush=True)
+
+    # Get terminal settings
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+
+    try:
+        tty.setraw(fd)
+        user_input = ""
+
+        while True:
+            char = sys.stdin.read(1)
+
+            # Handle Ctrl+C
+            if char == '\x03':
+                raise KeyboardInterrupt
+
+            # Handle Ctrl+D (EOF)
+            if char == '\x04':
+                raise EOFError
+
+            # Handle Enter
+            if char in ['\r', '\n']:
+                print()  # New line
+                return user_input.strip()
+
+            # Handle Backspace (both ASCII 127 and 8)
+            if char in ['\x7f', '\x08']:
+                if user_input:
+                    user_input = user_input[:-1]
+                    # Move cursor back, print space, move back again
+                    print('\b \b', end='', flush=True)
+                continue
+
+            # Handle printable characters
+            if char.isprintable():
+                user_input += char
+                print(char, end='', flush=True)
+
+                # Auto-submit when reaching target length (if all digits)
+                if len(user_input) == auto_submit_length and user_input.isdigit():
+                    print()  # New line
+                    return user_input.strip()
+
+    finally:
+        # Restore terminal settings
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 def load_inventory(csv_file):
     """Load device IDs from CSV file into a set for fast lookup"""
@@ -56,6 +117,7 @@ def display_header(csv_file, total_devices):
     print(f"{Colors.CYAN}{Colors.BOLD}{'='*60}{Colors.END}")
     print(f"{Colors.BLUE}Inventory File:{Colors.END} {csv_file}")
     print(f"{Colors.BLUE}Total Devices:{Colors.END} {total_devices}")
+    print(f"{Colors.YELLOW}Auto-submit enabled: Scans 6-digit IDs automatically{Colors.END}")
     print(f"{Colors.YELLOW}Type 'quit' or 'exit' to stop, 'clear' to clear screen{Colors.END}")
     print(f"{Colors.CYAN}{'='*60}{Colors.END}\n")
 
@@ -99,9 +161,9 @@ def main():
 
     try:
         while True:
-            # Get input
+            # Get input with auto-submit on 6 digits
             try:
-                user_input = input(f"{Colors.BOLD}Scan Device ID: {Colors.END}").strip()
+                user_input = get_scanner_input(f"{Colors.BOLD}Scan Device ID: {Colors.END}")
             except EOFError:
                 break
 
