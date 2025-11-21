@@ -70,7 +70,7 @@ Scanned ID: 051284
 ├─ Prefix: SL
 ├─ Merk: HP
 ├─ Type: 450_I5_G8_1135G7(Probook)
-└─ MAC: 50814081C516
+└─ MAC: A1B2C3D4E5F6
 ```
 
 ### Device Not Found (Red):
